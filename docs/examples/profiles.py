@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+# ]
+# ///
 """Profiles: create with a proxy, find, change safely, clone, trash and restore."""
 
 from wily_client import ConflictError, ProfileOs, WebrtcMode, Wily

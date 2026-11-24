@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+#     "playwright>=1.40",
+# ]
+# ///
 """The same as launch_playwright.py in one block: `running()` launches, yields the CDP endpoint, stops."""
 
 import sys

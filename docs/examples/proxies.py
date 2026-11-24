@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+# ]
+# ///
 """Proxies: create, check, change, list, delete."""
 
 from wily_client import ProxyDraft, ProxyKind, ProxyProtocol, Wily

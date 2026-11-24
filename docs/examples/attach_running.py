@@ -1,7 +1,15 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+#     "httpx>=0.27,<1",
+#     "playwright>=1.40",
+# ]
+# ///
 """A profile already running on this machine — started from the app's window or by another script:
 take its CDP endpoint and its proxy, drive it with Playwright, and stop it if you want.
 
-    python docs/examples/attach_running.py "shop-de-1" [--stop]
+    uv run docs/examples/attach_running.py "shop-de-1" [--stop]
 """
 
 import sys

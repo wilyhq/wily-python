@@ -7,7 +7,7 @@ Using the library:
 3. [Proxies](proxies.md) — `wily.proxies`.
 4. [Profiles](profiles.md) — `wily.profiles`: folders, safe updates, launching, Playwright.
 5. [Errors](errors.md) — one class per error code, and what each asks of you.
-6. [Examples](examples/) — scripts to copy:
+6. [Examples](examples/README.md) — scripts to copy; each runs with `uv run docs/examples/<script>.py`, see [how](examples/README.md):
 
    | script | shows |
    |---|---|

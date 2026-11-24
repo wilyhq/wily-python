@@ -1,7 +1,14 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+#     "playwright>=1.40",
+# ]
+# ///
 """Launch one profile, drive its browser with Playwright over CDP, stop the profile.
 
-    pip install playwright        # no `playwright install`: the browser is wily's
-    python docs/examples/launch_playwright.py "shop-de-1"
+    # no `playwright install` needed: the browser is wily's
+    uv run docs/examples/launch_playwright.py "shop-de-1"
 
 The three steps, each on its own:
 1. `launch` — the app starts the profile's browser on this machine, through the profile's proxy, with its

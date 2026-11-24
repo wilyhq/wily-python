@@ -34,7 +34,7 @@ Then sign in once (`wily login`, or [sign_in.py](examples/sign_in.py)): proxies 
 ## Check
 
 ```sh
-python docs/examples/quickstart.py
+uv run docs/examples/quickstart.py
 ```
 
-prints the app's version and the door it went through (`unix_socket` or `named_pipe`), or says the app is not running.
+(uv installs what the script needs on the way: [examples](examples/README.md)) prints the app's version and the door it went through (`unix_socket` or `named_pipe`), or says the app is not running.

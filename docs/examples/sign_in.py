@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+# ]
+# ///
 """Sign this machine in with a device code — the way for a headless box or an agent."""
 
 from wily_client import Wily

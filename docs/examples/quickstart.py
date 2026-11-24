@@ -1,4 +1,10 @@
-"""Is the app running, and who is signed in? `python docs/examples/quickstart.py`"""
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "wily-client @ git+https://github.com/wilyhq/wily-python",
+# ]
+# ///
+"""Is the app running, and who is signed in? `uv run docs/examples/quickstart.py`"""
 
 from wily_client import AuthRequiredError, UnavailableError, Wily
 
