@@ -23,6 +23,10 @@ Everything must work on macOS, Windows and Linux. Before using a path, a socket,
 ask what it does on the other two. Windows code is guarded with `if sys.platform == 'win32'` (`make typecheck` checks the
 branches of all three OSes from any machine). Makefile recipes stay POSIX shell, run from Git Bash on Windows.
 
+Consistency between the OSes is held by the suite, not by review: a test that talks to the app takes the `wily`
+fixture, which runs it over every door of the OS (Unix socket or named pipe, and TCP); `test_real_app.py` does the same
+against a real `wily serve`. A change about a door — naming, reading, timeouts — comes with a test that runs on each.
+
 ## Validation is pydantic's
 
 Rules on values a script sends live on the DTO as pydantic constraints and validators — not in applications, not

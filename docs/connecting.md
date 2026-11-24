@@ -39,6 +39,22 @@ Wily.connect(socket=r'\\.\pipe\wily-me')         # a Windows pipe
 Wily.connect(port=48123, token='…')              # the debug TCP door
 ```
 
+**The Windows pipe name.** Usually you never write it: `Wily.connect()` reads it from `desktop.json`. When you do, it
+is `\\.\pipe\wily-<your Windows user name>` — e.g. `\\.\pipe\wily-alice` — for the app's own data directory;
+under `WILY_DATA_DIR` the app adds a suffix from the path (`\\.\pipe\wily-alice-1a2b3c4d`) so that two apps never
+share a pipe. In Python write it as a raw string, `r'\\.\pipe\wily-alice'`: in a plain string `\\` is one backslash.
+To see the exact name, or to choose one:
+
+```python
+Wily.connect().door.address                      # the name this app listens on
+```
+
+```sh
+wily settings set api_socket_path '\\.\pipe\wily-mine'   # choose the pipe (Windows) or the socket path (macOS, Linux)
+```
+
+The suite checks both on every CI run, against a real app on Windows and macOS (`tests/test_real_app.py`).
+
 ## Timeouts
 
 Ordinary calls wait 30 s; `launch` waits up to 10 minutes, because the app may first download a browser core.

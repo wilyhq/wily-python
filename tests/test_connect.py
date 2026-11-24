@@ -63,3 +63,12 @@ def test_openapi_missing_on_old_app(wily: Wily, fake: FakeApp) -> None:
 )
 def test_data_dir_per_os(platform: str, env: dict[str, str], expected: str) -> None:
     assert data_dir(platform, env, Path('H')) == Path(expected)
+
+
+def test_a_large_answer_arrives_whole_over_every_door(wily: Wily, fake: FakeApp) -> None:
+    """Hundreds of kilobytes come in many reads; on a Windows pipe a read that finished at once was lost before."""
+    for n in range(400):
+        fake.profiles_create({'name': f'p{n:03}', 'notes': 'x' * 1000})
+    profiles = wily.profiles.list()
+    assert len(profiles) == 400
+    assert profiles[-1].notes == 'x' * 1000

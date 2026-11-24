@@ -49,8 +49,17 @@ single quotes and 128 columns; `ty`; `import-linter` contracts; `complexipy` at 
 - **`tests/fake_app.py`** — the app's routes and answers in memory, served over a real door: a Unix socket on
   macOS and Linux, a named pipe on Windows, and TCP with a token on all three. Every test runs once per door, so the
   transport of the OS under test is exercised, not mocked.
-- **`tests/test_real_app.py`** (`-m real_app`) — starts a released `wily serve` with its own `WILY_DATA_DIR` and
-  talks to it: health, sign-in state, schema, and that account operations ask for a sign-in. No account needed.
+- **`tests/test_real_app.py`** (`-m real_app`) — starts a real `wily serve` with its own `WILY_DATA_DIR`, once per
+  door, and runs the same checks through each: the door `desktop.json` names (socket or pipe), a socket path or pipe
+  name set with `api_socket_path` and given to `Wily.connect(socket=…)` directly, and the TCP door with its token.
+  Checks: health, sign-in state, schema, that account operations ask for a sign-in, and that the name the app writes
+  is the one [connecting.md](connecting.md) documents (`\\.\pipe\wily-<user>` on Windows). No account needed.
+
+**One behaviour on three OSes is held by tests, not by reading code.** macOS and Linux reach the app over a Unix
+socket, Windows over a named pipe with its own transport (`common/infrastructure/pipe.py`); a feature that works on
+one door can break on another. So a test that talks to the app runs over every door (the `wily` fixture does it), and
+CI runs the suite on all three OSes. Something about a door — its name, a large answer, a timeout — gets a test in
+`test_connect.py` (fake app) and, when the app decides it, in `test_real_app.py`.
 
 ```sh
 make test-real WILY_BIN=/opt/homebrew/bin/wily          # macOS
