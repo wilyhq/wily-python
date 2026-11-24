@@ -88,6 +88,23 @@ CDP `Browser.close`, Chromium writes its cookies and exits, and the app saves th
 session; `stop` returns once the app reports the profile stopped. Playwright's own `browser.close()` is **not** a
 stop: on a browser it did not start, it only disconnects, and the window stays open.
 
+**What a page can see.** Driving a browser over CDP is visible to a page unless the core hides it, and wily.bot
+checks exactly this (measured on wily.bot, 24.11.2026):
+
+| core | what a page sees |
+|---|---|
+| stock Chromium / Chrome for Testing (`cft-…`) | `navigator.webdriver` is `true` — the app starts the browser with `--remote-debugging-port=0`, which stock Chromium treats as ChromeDriver mode; Playwright's `Runtime.enable` shows in the window and in workers; verdict «automated» |
+| wily's Chromium (`chromium-159`) | none of the above: connecting, `goto` and `evaluate` leave no automation finding |
+
+Input still shows on every core today: a CDP click into a cross-site frame and Playwright's scroll-into-view are
+told apart from a hand (medium findings; being closed in wily's core). Use the stock core for tests, wily's core for
+work, and check with `launch.warnings` which one actually started — a profile whose core is not installed runs on
+another one.
+
+- Connect with `connect_over_cdp`, not Playwright's own `launch`: that one adds its own switches and is detectable.
+- Open your own tab (`context.new_page()`) rather than `context.pages[0]`: Chromium 159 lists browser-UI targets
+  (`chrome://omnibox-popup…`) among the pages.
+
 `launch` needs a signed-in app and an installed browser core for this OS (`wily cores install <id>`); otherwise it
 raises `ConflictError` naming what is missing. A profile running on another device raises `ConflictError`
 (`profile_in_use`). `launch.warnings` lists what the app adjusted. Closing the browser window ends the profile's
