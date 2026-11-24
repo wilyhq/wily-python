@@ -63,6 +63,9 @@ class PipeStream(httpcore.NetworkStream):
         try:
             if err == _winapi.ERROR_IO_PENDING:
                 self._wait(ov, timeout, httpcore.ReadTimeout)
+            else:
+                # Completed at once (the data was already in the pipe): the buffer is readable only after this.
+                ov.GetOverlappedResult(True)
             return bytes(ov.getbuffer() or b'')
         except OSError as e:
             if e.winerror in CLOSED:
