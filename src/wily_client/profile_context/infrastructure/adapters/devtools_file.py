@@ -14,6 +14,14 @@ LINES = 2  # the port, then the browser target's path
 
 
 class DevToolsFileAdapter:
+    """`<data dir>/profiles/<id>/` is where the app keeps each profile's browser data, on every OS."""
+
+    def __init__(self, profiles_root: Path) -> None:
+        self._root = profiles_root
+
+    def user_data_dir(self, profile_id: str) -> Path:
+        return self._root / profile_id
+
     def read(self, user_data_dir: Path) -> DevTools | None:
         try:
             lines = (user_data_dir / FILE).read_text(encoding='utf-8').splitlines()

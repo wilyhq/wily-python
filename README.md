@@ -21,6 +21,9 @@ with Wily.connect() as wily:                       # finds the running app throu
     profile = wily.profiles.create(name='shop-1', proxy_id=proxy.id, os='windows11')
     with wily.profiles.running(profile.id) as devtools:  # browser opens through the proxy, stops at the end
         print(devtools.http_url)                         # CDP endpoint for Playwright / Puppeteer
+
+    running = wily.profiles.attach(profile_id)           # a profile already running here, e.g. from the app's window
+    print(running.devtools.http_url, running.proxy_server)
 ```
 
 Requires Python 3.11+ and a running wily app (or `wily serve` on a machine without a window); profiles and proxies

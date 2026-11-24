@@ -287,36 +287,49 @@ def _read_frame(conn: socket.socket) -> bytes:
 
 
 def serve_devtools(app: FakeApp, profile_id: str) -> int:
-    """One WebSocket client, like a browser's DevTools: `Browser.close` stops the profile."""
+    """Like a browser's DevTools port: `/json/version` over HTTP, and a WebSocket where `Browser.close`
+    stops the profile and closes the port."""
     server = socket.create_server(('127.0.0.1', 0))
+    port = server.getsockname()[1]
+
+    def serve(conn: socket.socket) -> bool:
+        request = b''
+        while b'\r\n\r\n' not in request:
+            chunk = conn.recv(4096)
+            if not chunk:
+                return True
+            request += chunk
+        if b'Upgrade: websocket' not in request:
+            body = json.dumps({'webSocketDebuggerUrl': f'ws://127.0.0.1:{port}/devtools/browser/abc'}).encode()
+            conn.sendall(
+                b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n'
+                b'Content-Length: ' + str(len(body)).encode() + b'\r\n\r\n' + body
+            )
+            return True
+        key = re.search(rb'Sec-WebSocket-Key: (\S+)', request)
+        digest = hashlib.sha1(key.group(1) + b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest() if key else b''  # noqa: S324
+        conn.sendall(
+            b'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+            b'Sec-WebSocket-Accept: ' + base64.b64encode(digest) + b'\r\n\r\n'
+        )
+        method = json.loads(_read_frame(conn))['method']
+        with app.lock:
+            app.cdp_methods.append(method)
+            if method == 'Browser.close':
+                app.profiles[profile_id]['state'] = 'stopped'
+                return False
+        return True
 
     def run() -> None:
         with server:
-            conn, _ = server.accept()
-            with conn:
-                request = b''
-                while b'\r\n\r\n' not in request:
-                    request += conn.recv(4096)
-                key = re.search(rb'Sec-WebSocket-Key: (\S+)', request)
-                accept = (
-                    base64.b64encode(
-                        hashlib.sha1(key.group(1) + b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest()  # noqa: S324
-                    )
-                    if key
-                    else b''
-                )
-                conn.sendall(
-                    b'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
-                    b'Sec-WebSocket-Accept: ' + accept + b'\r\n\r\n'
-                )
-                method = json.loads(_read_frame(conn))['method']
-                with app.lock:
-                    app.cdp_methods.append(method)
-                    if method == 'Browser.close':
-                        app.profiles[profile_id]['state'] = 'stopped'
+            going = True
+            while going:
+                conn, _ = server.accept()
+                with conn:
+                    going = serve(conn)
 
     threading.Thread(target=run, daemon=True).start()
-    return server.getsockname()[1]
+    return port
 
 
 # --- doors -----------------------------------------------------------------------------------

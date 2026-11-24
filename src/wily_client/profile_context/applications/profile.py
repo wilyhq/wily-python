@@ -4,14 +4,17 @@ import time
 from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
-from wily_client.common.domains.errors import NotFoundError, UnavailableError
+from wily_client.common.domains.errors import ConflictError, NotFoundError, UnavailableError
 from wily_client.profile_context.domains.dto.profile import ProfileChanges, ProfileDraft, ProfileFilter
+from wily_client.profile_context.domains.value_objects.profile import RunningBrowser
+
+PROXY_SWITCH = '--proxy-server='
 
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Iterator
 
-    from wily_client.profile_context.applications.gateway import BrowserGateway, DevToolsGateway, ProfileGateway
+    from wily_client.profile_context.applications.gateway import BrowserGateway, DevToolsGateway, ProcessGateway, ProfileGateway
     from wily_client.profile_context.domains.entities.profile import Folder, Profile
     from wily_client.profile_context.domains.value_objects.profile import DevTools, Launch
 
@@ -19,10 +22,13 @@ if TYPE_CHECKING:
 class ProfileApplication:
     """`wily.profiles`: browser profiles — list, create, change, trash, and launch on this machine."""
 
-    def __init__(self, gateway: ProfileGateway, devtools: DevToolsGateway, browser: BrowserGateway) -> None:
+    def __init__(
+        self, gateway: ProfileGateway, devtools: DevToolsGateway, browser: BrowserGateway, processes: ProcessGateway
+    ) -> None:
         self._gateway = gateway
         self._devtools = devtools
         self._browser = browser
+        self._processes = processes
 
     def list(self, profile_filter: ProfileFilter | None = None, **fields: Any) -> builtins.list[Profile]:
         return self._gateway.list(profile_filter or ProfileFilter(**fields))
@@ -71,13 +77,34 @@ class ProfileApplication:
             time.sleep(interval)
         return found
 
-    def stop(self, launch: Launch, timeout: float = 30.0, interval: float = 0.5) -> Profile:
+    def attach(self, profile_id: str) -> RunningBrowser:
+        """The running browser of a profile on this machine: its CDP endpoint, its proxy, its pid.
+
+        Works for a profile started by a script or from the app's window alike. Raises `ConflictError` when
+        the profile's browser does not run here (it may run on another device: `get(id).running`).
+        """
+        user_data_dir = self._devtools.user_data_dir(profile_id)
+        found = self._devtools.read(user_data_dir)
+        if found is None or not self._browser.alive(found):
+            raise ConflictError(f'the browser of profile {profile_id} does not run on this machine')
+        process = self._processes.find_browser(user_data_dir)
+        args = process[1] if process else []
+        proxy = next((a.split('=', 1)[1] for a in args if a.startswith(PROXY_SWITCH)), None)
+        return RunningBrowser(
+            profile_id=profile_id,
+            pid=process[0] if process else None,
+            user_data_dir=user_data_dir,
+            devtools=found,
+            proxy_server=proxy,
+        )
+
+    def stop(self, launch: Launch | RunningBrowser, timeout: float = 30.0, interval: float = 0.5) -> Profile:
         """Closes the profile's browser (CDP `Browser.close`) and waits until the app reports it stopped.
 
         The app has no stop route yet, so this is what a person closing the window does: Chromium writes
         its cookies, the app saves the profile's state and releases its session.
         """
-        found = self._devtools.read(launch.user_data_dir)
+        found = launch.devtools if isinstance(launch, RunningBrowser) else self._devtools.read(launch.user_data_dir)
         if found is not None:
             with suppress(OSError):  # already gone: then only the wait below matters
                 self._browser.send(found, 'Browser.close')

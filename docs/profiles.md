@@ -15,6 +15,7 @@ account; launching one starts a real browser on **this** machine.
 | `devtools(launch)` | wait for the browser's CDP endpoint → `DevTools` |
 | `stop(launch)` | close the browser and wait until the app has stopped the profile |
 | `running(id)` | context manager: launch, yield `DevTools`, stop — even if the block raised |
+| `attach(id)` | a profile already running here (from the app's window or another script) → `RunningBrowser`: CDP, proxy, pid |
 | `folders()` / `create_folder(name)` / `delete_folder(id)` | folders |
 
 ## Create
@@ -87,6 +88,33 @@ with wily.profiles.running(profile.id) as devtools, sync_playwright() as pw:
 CDP `Browser.close`, Chromium writes its cookies and exits, and the app saves the profile's state and releases its
 session; `stop` returns once the app reports the profile stopped. Playwright's own `browser.close()` is **not** a
 stop: on a browser it did not start, it only disconnects, and the window stays open.
+
+## A profile that is already running
+
+`attach(id)` finds a profile's browser running on this machine, whoever started it — the app's window, another
+script — and returns `RunningBrowser`:
+
+| field | what |
+|---|---|
+| `devtools` | the CDP endpoint (`http_url` for Playwright, `ws_url`) |
+| `proxy_server` | what the browser connects through: the proxy (`http://host:port`, `socks5://…`) or, for a proxy with a login, the app's local forwarder `http://127.0.0.1:<port>` — usable from this machine without the password, with the same exit as the browser |
+| `pid` | the browser's main process |
+| `user_data_dir` | the profile's browser data, `<data dir>/profiles/<id>` |
+
+```python
+running = wily.profiles.attach(profile.id)      # ConflictError if it does not run on this machine
+browser = pw.chromium.connect_over_cdp(running.devtools.http_url)
+httpx.get('https://api.ipify.org', proxy=running.proxy_server)   # the same exit IP as the browser
+wily.profiles.stop(running)                      # optional: stop it
+```
+
+`wily.proxy_of(profile_id)` gives the profile's configured proxy in full (host, port, login, `url()`), or `None`.
+
+How it is found, since the app has no operation for it yet: the CDP port from `DevToolsActivePort` in the profile's
+data directory, confirmed by an answer on that port (the file outlives the browser); the proxy from the
+`--proxy-server` switch of the browser process that has the profile's `--user-data-dir` (`psutil`, all three OSes).
+Checked against `wily serve` 0.1.6 on macOS with a proxy that has a login (24.11.2026). Script:
+[examples/attach_running.py](examples/attach_running.py).
 
 **What a page can see.** Driving a browser over CDP is visible to a page unless the core hides it, and wily.bot
 checks exactly this (measured on wily.bot, 24.11.2026):

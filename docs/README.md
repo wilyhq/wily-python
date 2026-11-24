@@ -16,6 +16,7 @@ Using the library:
    | [proxies.py](examples/proxies.py) | create, check, change, list, delete, import |
    | [profiles.py](examples/profiles.py) | folders, create with a proxy, update with ETag, clone, trash |
    | [launch_playwright.py](examples/launch_playwright.py) | launch a profile, drive it with Playwright over CDP, stop it |
+   | [attach_running.py](examples/attach_running.py) | a profile already running: its CDP endpoint and proxy, Playwright, stop |
    | [launch_playwright_short.py](examples/launch_playwright_short.py) | the same in one `with wily.profiles.running(...)` block |
 
 Working on the library:

@@ -51,3 +51,15 @@ class DevTools(ValueObject):
     @property
     def ws_url(self) -> str:
         return f'ws://127.0.0.1:{self.port}{self.browser_path}'
+
+
+class RunningBrowser(ValueObject):
+    """A profile's browser running on this machine — whoever started it: a script or the app's window."""
+
+    profile_id: str
+    pid: int | None
+    user_data_dir: Path
+    devtools: DevTools
+    proxy_server: str | None = None
+    """What the browser goes through: `scheme://host:port` of the proxy, or the app's local forwarder
+    `http://127.0.0.1:<port>` for a proxy with a login — reachable from this machine without the password."""

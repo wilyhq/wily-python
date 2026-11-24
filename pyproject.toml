@@ -19,6 +19,8 @@ dependencies = [
     "httpx>=0.27,<1",
     "httpcore>=1.0.5,<2",
     "pydantic>=2.7,<3",
+    # Finds a running profile's browser process and its --proxy-server, on all three OSes.
+    "psutil>=5.9,<8",
 ]
 
 [project.urls]

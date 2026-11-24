@@ -16,6 +16,8 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
+import httpx
+
 if TYPE_CHECKING:
     from wily_client.profile_context.domains.value_objects.profile import DevTools
 
@@ -40,6 +42,14 @@ def _frame(payload: bytes) -> bytes:
 
 
 class DevToolsSocketAdapter:
+    def alive(self, devtools: DevTools) -> bool:
+        """`DevToolsActivePort` outlives the browser: only an answer on the port says it runs."""
+        try:
+            answer = httpx.get(f'{devtools.http_url}/json/version', timeout=2.0)
+        except httpx.HTTPError:
+            return False
+        return answer.is_success and answer.json().get('webSocketDebuggerUrl', '').endswith(devtools.browser_path)
+
     def send(self, devtools: DevTools, method: str, timeout: float = 10.0) -> None:
         url = urlsplit(devtools.ws_url)
         with socket.create_connection(('127.0.0.1', devtools.port), timeout=timeout) as sock:

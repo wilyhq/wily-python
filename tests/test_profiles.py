@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import ValidationError
 
-from wily_client import ConflictError, ProfileOs, Wily
+from wily_client import ConflictError, Launch, ProfileOs, Wily
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from fake_app import FakeApp
 
 
@@ -92,3 +96,50 @@ def test_folders(wily: Wily) -> None:
     folder = wily.profiles.create_folder('Shops')
     assert [f.name for f in wily.profiles.folders()] == ['Shops']
     assert folder.id
+
+
+def test_attach_to_a_running_profile(wily: Wily, fake: FakeApp, tmp_path: Path) -> None:
+    """A profile started elsewhere (the app's window): CDP from its DevToolsActivePort, proxy from its process."""
+    profile = wily.profiles.create(name='gui')
+    with pytest.raises(ConflictError, match='does not run'):
+        wily.profiles.attach(profile.id)
+
+    launch = wily.profiles.launch(profile.id)
+    user_data_dir = tmp_path / 'profiles' / profile.id
+    assert launch.user_data_dir == user_data_dir
+    # A stand-in for the browser's main process, with the switches the app gives it.
+    browser = subprocess.Popen(  # noqa: S603
+        [
+            sys.executable,
+            '-c',
+            'import time; time.sleep(60)',
+            f'--user-data-dir={user_data_dir}',
+            '--proxy-server=http://127.0.0.1:47001',
+            '--remote-debugging-port=0',
+        ],
+    )
+    try:
+        running = wily.profiles.attach(profile.id)
+        assert running.pid == browser.pid
+        assert running.proxy_server == 'http://127.0.0.1:47001'
+        assert running.devtools.http_url == launch_devtools_url(wily, launch)
+        wily.profiles.stop(running, timeout=5, interval=0.05)
+    finally:
+        browser.kill()
+    assert fake.cdp_methods == ['Browser.close']
+    with pytest.raises(ConflictError, match='does not run'):
+        wily.profiles.attach(profile.id)  # the port is closed: a stale DevToolsActivePort is not a browser
+
+
+def launch_devtools_url(wily: Wily, launch: Launch) -> str:
+    return wily.profiles.devtools(launch, timeout=2).http_url
+
+
+def test_proxy_of_a_profile(wily: Wily) -> None:
+    proxy = wily.proxies.create(name='de', protocol='http', host='gate.example.net', port=8080, username='u', password='p')
+    with_proxy = wily.profiles.create(name='a', proxy_id=proxy.id)
+    found = wily.proxy_of(with_proxy.id)
+    assert found == proxy
+    assert found is not None
+    assert found.url() == 'http://u:p@gate.example.net:8080'
+    assert wily.proxy_of(wily.profiles.create(name='b').id) is None

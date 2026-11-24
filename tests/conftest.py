@@ -22,7 +22,7 @@ DOORS = ['pipe' if sys.platform == 'win32' else 'unix', 'tcp']
 
 @pytest.fixture
 def fake(tmp_path: Path) -> FakeApp:
-    return FakeApp(tmp_path / 'browsers')
+    return FakeApp(tmp_path / 'profiles')  # where the app keeps profiles: <data dir>/profiles/<id>
 
 
 @pytest.fixture(params=DOORS)
