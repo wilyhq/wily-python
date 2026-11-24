@@ -14,6 +14,7 @@ from wily_client.common.infrastructure.local_api import DEFAULT_TIMEOUT, LocalAp
 from wily_client.common.services.choose_door import choose_door, is_pipe_name
 from wily_client.profile_context.applications.profile import ProfileApplication
 from wily_client.profile_context.infrastructure.adapters.devtools_file import DevToolsFileAdapter
+from wily_client.profile_context.infrastructure.adapters.devtools_socket import DevToolsSocketAdapter
 from wily_client.profile_context.infrastructure.adapters.local_api import ProfileLocalApiAdapter
 from wily_client.proxy_context.applications.proxy import ProxyApplication
 from wily_client.proxy_context.infrastructure.adapters.local_api import ProxyLocalApiAdapter
@@ -42,7 +43,7 @@ class Wily:
         self.door = door
         self.app = AppApplication(AppLocalApiAdapter(self._api))
         self.proxies = ProxyApplication(ProxyLocalApiAdapter(self._api))
-        self.profiles = ProfileApplication(ProfileLocalApiAdapter(self._api), DevToolsFileAdapter())
+        self.profiles = ProfileApplication(ProfileLocalApiAdapter(self._api), DevToolsFileAdapter(), DevToolsSocketAdapter())
 
     @classmethod
     def connect(

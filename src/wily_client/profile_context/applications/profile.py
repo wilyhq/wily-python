@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 from wily_client.common.domains.errors import NotFoundError, UnavailableError
@@ -8,8 +9,9 @@ from wily_client.profile_context.domains.dto.profile import ProfileChanges, Prof
 
 if TYPE_CHECKING:
     import builtins
+    from collections.abc import Iterator
 
-    from wily_client.profile_context.applications.gateway import DevToolsGateway, ProfileGateway
+    from wily_client.profile_context.applications.gateway import BrowserGateway, DevToolsGateway, ProfileGateway
     from wily_client.profile_context.domains.entities.profile import Folder, Profile
     from wily_client.profile_context.domains.value_objects.profile import DevTools, Launch
 
@@ -17,9 +19,10 @@ if TYPE_CHECKING:
 class ProfileApplication:
     """`wily.profiles`: browser profiles — list, create, change, trash, and launch on this machine."""
 
-    def __init__(self, gateway: ProfileGateway, devtools: DevToolsGateway) -> None:
+    def __init__(self, gateway: ProfileGateway, devtools: DevToolsGateway, browser: BrowserGateway) -> None:
         self._gateway = gateway
         self._devtools = devtools
+        self._browser = browser
 
     def list(self, profile_filter: ProfileFilter | None = None, **fields: Any) -> builtins.list[Profile]:
         return self._gateway.list(profile_filter or ProfileFilter(**fields))
@@ -67,6 +70,38 @@ class ProfileApplication:
                 raise UnavailableError(f'the browser of {launch.profile_id} wrote no DevTools port in {timeout} s')
             time.sleep(interval)
         return found
+
+    def stop(self, launch: Launch, timeout: float = 30.0, interval: float = 0.5) -> Profile:
+        """Closes the profile's browser (CDP `Browser.close`) and waits until the app reports it stopped.
+
+        The app has no stop route yet, so this is what a person closing the window does: Chromium writes
+        its cookies, the app saves the profile's state and releases its session.
+        """
+        found = self._devtools.read(launch.user_data_dir)
+        if found is not None:
+            with suppress(OSError):  # already gone: then only the wait below matters
+                self._browser.send(found, 'Browser.close')
+        deadline = time.monotonic() + timeout
+        while (profile := self._gateway.get(launch.profile_id)).running:
+            if time.monotonic() >= deadline:
+                raise UnavailableError(f'{launch.profile_id} still runs {timeout} s after Browser.close')
+            time.sleep(interval)
+        return profile
+
+    @contextmanager
+    def running(self, profile_id: str, timeout: float = 30.0) -> Iterator[DevTools]:
+        """Launch, hand over the CDP endpoint, stop on the way out — even if the block raised.
+
+        ```python
+        with wily.profiles.running(profile.id) as devtools:
+            browser = playwright.chromium.connect_over_cdp(devtools.http_url)
+        ```
+        """
+        launch = self.launch(profile_id)
+        try:
+            yield self.devtools(launch, timeout=timeout)
+        finally:
+            self.stop(launch, timeout=timeout)
 
     def folders(self) -> builtins.list[Folder]:
         return self._gateway.folders()

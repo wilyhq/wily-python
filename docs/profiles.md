@@ -13,6 +13,8 @@ account; launching one starts a real browser on **this** machine.
 | `clone(id)` | a copy |
 | `launch(id)` | start its browser here → `Launch` |
 | `devtools(launch)` | wait for the browser's CDP endpoint → `DevTools` |
+| `stop(launch)` | close the browser and wait until the app has stopped the profile |
+| `running(id)` | context manager: launch, yield `DevTools`, stop — even if the block raised |
 | `folders()` / `create_folder(name)` / `delete_folder(id)` | folders |
 
 ## Create
@@ -57,18 +59,34 @@ except ConflictError:
 
 `update(profile_id, …)` with a bare id writes unconditionally.
 
-## Launch and drive
+## Launch, drive with Playwright, stop
+
+Three steps — a browser window opens on this machine, Playwright drives it over CDP, the profile stops:
 
 ```python
-launch = wily.profiles.launch(profile.id)   # the app starts the browser through the profile's proxy
-devtools = wily.profiles.devtools(launch)   # waits for the browser's DevToolsActivePort
+launch = wily.profiles.launch(profile.id)   # 1. the app starts the browser through the profile's proxy
+try:
+    devtools = wily.profiles.devtools(launch)   # 2. its CDP endpoint, once the browser has opened it
+    with sync_playwright() as pw:
+        browser = pw.chromium.connect_over_cdp(devtools.http_url)
+        page = browser.contexts[0].new_page()   # the profile's own context: its cookies and proxy
+        page.goto('https://wily.bot/')
+finally:
+    wily.profiles.stop(launch)                  # 3. close the browser, wait until the profile is stopped
+```
 
-from playwright.sync_api import sync_playwright
-with sync_playwright() as pw:
-    browser = pw.chromium.connect_over_cdp(devtools.http_url)
-    page = browser.contexts[0].new_page()
+Or in one block, stopping on the way out whatever happens inside:
+
+```python
+with wily.profiles.running(profile.id) as devtools, sync_playwright() as pw:
+    page = pw.chromium.connect_over_cdp(devtools.http_url).contexts[0].new_page()
     page.goto('https://wily.bot/')
 ```
+
+**Stopping.** The app has no stop operation yet, so `stop` does what closing the window does: it sends the browser
+CDP `Browser.close`, Chromium writes its cookies and exits, and the app saves the profile's state and releases its
+session; `stop` returns once the app reports the profile stopped. Playwright's own `browser.close()` is **not** a
+stop: on a browser it did not start, it only disconnects, and the window stays open.
 
 `launch` needs a signed-in app and an installed browser core for this OS (`wily cores install <id>`); otherwise it
 raises `ConflictError` naming what is missing. A profile running on another device raises `ConflictError`
@@ -78,4 +96,6 @@ session; the app saves its cookies.
 `Launch`: `profile_id`, `core`, `pid`, `executable`, `user_data_dir`, `session_id`, `warnings`.
 `DevTools`: `port`, `http_url` (Playwright `connect_over_cdp`, Puppeteer `browserURL`), `ws_url`.
 
-Full script: [examples/launch_playwright.py](examples/launch_playwright.py).
+Full scripts: [examples/launch_playwright.py](examples/launch_playwright.py) (the three steps) and
+[examples/launch_playwright_short.py](examples/launch_playwright_short.py) (`running`). Both were run against
+`wily serve` 0.1.6 on macOS with a signed-in account (24.11.2026).

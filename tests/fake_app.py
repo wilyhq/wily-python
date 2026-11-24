@@ -7,10 +7,13 @@ tests run the library's real transport for the OS they run on. Answers copy the 
 
 from __future__ import annotations
 
+import base64
 import contextlib
+import hashlib
 import io
 import json
 import re
+import socket
 import socketserver
 import sys
 import threading
@@ -44,6 +47,7 @@ class FakeApp:
         self.signed_in = True
         self.user_data_root = user_data_root
         self.lock = threading.Lock()
+        self.cdp_methods: list[str] = []
         self.routes: list[tuple[str, re.Pattern[str], Callable[..., Answer]]] = [
             (m, re.compile(f'^{p}$'), h)
             for m, p, h in [
@@ -251,7 +255,8 @@ class FakeApp:
         p['state'] = 'running'
         data_dir = self.user_data_root / id
         data_dir.mkdir(parents=True, exist_ok=True)
-        (data_dir / 'DevToolsActivePort').write_text('9333\n/devtools/browser/abc\n', encoding='utf-8')
+        port = serve_devtools(self, id)
+        (data_dir / 'DevToolsActivePort').write_text(f'{port}\n/devtools/browser/abc\n', encoding='utf-8')
         launched = {'pid': 777, 'executable': '/cores/chromium/chrome', 'user_data_dir': str(data_dir)}
         return 200, {'profile_id': id, 'core': p['core'], 'launched': launched, 'session_id': 's1', 'warnings': []}
 
@@ -262,6 +267,56 @@ class FakeApp:
         f = {'id': str(uuid.uuid4()), 'name': payload['name']}
         self.folders[f['id']] = f
         return 200, {'folder': f}
+
+
+# --- a browser's DevTools socket -------------------------------------------------------------
+
+
+def _read_frame(conn: socket.socket) -> bytes:
+    head = conn.recv(2)
+    size = head[1] & 0x7F
+    if size == 126:
+        size = int.from_bytes(conn.recv(2), 'big')
+    elif size == 127:
+        size = int.from_bytes(conn.recv(8), 'big')
+    key = conn.recv(4)
+    data = b''
+    while len(data) < size:
+        data += conn.recv(size - len(data))
+    return bytes(b ^ key[i % 4] for i, b in enumerate(data))
+
+
+def serve_devtools(app: FakeApp, profile_id: str) -> int:
+    """One WebSocket client, like a browser's DevTools: `Browser.close` stops the profile."""
+    server = socket.create_server(('127.0.0.1', 0))
+
+    def run() -> None:
+        with server:
+            conn, _ = server.accept()
+            with conn:
+                request = b''
+                while b'\r\n\r\n' not in request:
+                    request += conn.recv(4096)
+                key = re.search(rb'Sec-WebSocket-Key: (\S+)', request)
+                accept = (
+                    base64.b64encode(
+                        hashlib.sha1(key.group(1) + b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest()  # noqa: S324
+                    )
+                    if key
+                    else b''
+                )
+                conn.sendall(
+                    b'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+                    b'Sec-WebSocket-Accept: ' + accept + b'\r\n\r\n'
+                )
+                method = json.loads(_read_frame(conn))['method']
+                with app.lock:
+                    app.cdp_methods.append(method)
+                    if method == 'Browser.close':
+                        app.profiles[profile_id]['state'] = 'stopped'
+
+    threading.Thread(target=run, daemon=True).start()
+    return server.getsockname()[1]
 
 
 # --- doors -----------------------------------------------------------------------------------

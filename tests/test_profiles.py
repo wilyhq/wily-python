@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from pydantic import ValidationError
 
 from wily_client import ConflictError, ProfileOs, Wily
+
+if TYPE_CHECKING:
+    from fake_app import FakeApp
 
 
 def test_profile_lifecycle(wily: Wily) -> None:
@@ -40,16 +45,28 @@ def test_update_refuses_a_lost_change(wily: Wily) -> None:
     assert wily.profiles.update(wily.profiles.get(profile.id), notes='mine').notes == 'mine'
 
 
-def test_launch_and_devtools(wily: Wily) -> None:
+def test_launch_devtools_and_stop(wily: Wily, fake: FakeApp) -> None:
     profile = wily.profiles.create(name='run')
     launch = wily.profiles.launch(profile.id)
     assert launch.pid == 777
     assert launch.session_id == 's1'
     devtools = wily.profiles.devtools(launch, timeout=2)
-    assert devtools.http_url == 'http://127.0.0.1:9333'
-    assert devtools.ws_url == 'ws://127.0.0.1:9333/devtools/browser/abc'
+    assert devtools.http_url == f'http://127.0.0.1:{devtools.port}'
+    assert devtools.ws_url.endswith('/devtools/browser/abc')
     with pytest.raises(ConflictError, match='already running'):
         wily.profiles.launch(profile.id)
+    stopped = wily.profiles.stop(launch, timeout=5, interval=0.05)
+    assert not stopped.running
+    assert fake.cdp_methods == ['Browser.close']
+
+
+def test_running_stops_even_when_the_block_fails(wily: Wily, fake: FakeApp) -> None:
+    profile = wily.profiles.create(name='ctx')
+    with pytest.raises(RuntimeError), wily.profiles.running(profile.id) as devtools:
+        assert devtools.port
+        raise RuntimeError
+    assert not wily.profiles.get(profile.id).running
+    assert fake.cdp_methods == ['Browser.close']
 
 
 @pytest.mark.parametrize(

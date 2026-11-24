@@ -27,3 +27,7 @@ class ProfileGateway(Protocol):
 
 class DevToolsGateway(Protocol):
     def read(self, user_data_dir: Path) -> DevTools | None: ...
+
+
+class BrowserGateway(Protocol):
+    def send(self, devtools: DevTools, method: str, timeout: float = 10.0) -> None: ...

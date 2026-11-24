@@ -15,7 +15,8 @@ Using the library:
    | [sign_in.py](examples/sign_in.py) | device-code sign-in for a headless box or an agent |
    | [proxies.py](examples/proxies.py) | create, check, change, list, delete, import |
    | [profiles.py](examples/profiles.py) | folders, create with a proxy, update with ETag, clone, trash |
-   | [launch_playwright.py](examples/launch_playwright.py) | launch a profile and drive it with Playwright |
+   | [launch_playwright.py](examples/launch_playwright.py) | launch a profile, drive it with Playwright over CDP, stop it |
+   | [launch_playwright_short.py](examples/launch_playwright_short.py) | the same in one `with wily.profiles.running(...)` block |
 
 Working on the library:
 
