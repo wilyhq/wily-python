@@ -51,7 +51,10 @@ before the call leaves the script, and a bad value raises `pydantic.ValidationEr
 
 - `alive` — the last check's verdict, `None` if it was never checked;
 - `url()` — `socks5://user:pass@host:port` with the login escaped, for httpx, requests or Playwright;
-  `url(with_credentials=False)` for a log line.
+  `url(with_credentials=False)` for a log line. A login or password with `{session}` is a template the server
+  fills per profile, so `url()` raises `ValueError` on it: connecting with the template as is lands on a session no
+  profile uses. Take the filled address of a profile from `wily.profiles.proxy(profile_id).upstream`
+  ([profiles.md](profiles.md#the-profiles-proxy-from-python)).
 
 `password` is plaintext, as the account stores it (vendors put the country and the session in it). It is hidden from
 `repr(proxy)`; do not log `proxy.model_dump()` whole.

@@ -16,6 +16,7 @@ account; launching one starts a real browser on **this** machine.
 | `stop(launch)` | close the browser and wait until the app has stopped the profile |
 | `running(id)` | context manager: launch, yield `DevTools`, stop — even if the block raised |
 | `attach(id)` | a profile already running here (from the app's window or another script) → `RunningBrowser`: CDP, proxy, pid |
+| `proxy(id)` | its proxy as the app connects to it → `ProfileProxy`: the forwarder the browser uses, and the provider address with `{session}` filled |
 | `folders()` / `create_folder(name)` / `delete_folder(id)` | folders |
 
 ## Create
@@ -108,13 +109,35 @@ httpx.get('https://api.ipify.org', proxy=running.proxy_server)   # the same exit
 wily.profiles.stop(running)                      # optional: stop it
 ```
 
-`wily.proxy_of(profile_id)` gives the profile's configured proxy in full (host, port, login, `url()`), or `None`.
 
 How it is found, since the app has no operation for it yet: the CDP port from `DevToolsActivePort` in the profile's
 data directory, confirmed by an answer on that port (the file outlives the browser); the proxy from the
 `--proxy-server` switch of the browser process that has the profile's `--user-data-dir` (`psutil`, all three OSes).
 Checked against `wily serve` 0.1.6 on macOS with a proxy that has a login (24.11.2026). Script:
 [examples/attach_running.py](examples/attach_running.py).
+
+### The profile's proxy, from Python
+
+`wily.profiles.proxy(profile_id)` — the profile's proxy as the app connects to it, or `None` without one. Two ways to
+leave through the same exit as the profile's browser:
+
+| field | what it is |
+|---|---|
+| `proxy_server` | what the running browser goes through: for a proxy with a login, the app's local forwarder `http://127.0.0.1:<port>` — no password needed; `None` while the profile does not run in this app |
+| `upstream` | the provider's address with this profile's login and password, `{session}` already filled by the server — the same sticky session as the browser, running or not. It carries the password: hidden from `repr`, never log it |
+| `running`, `proxy_id`, `name` | whether it runs in this app, and which proxy |
+
+```python
+proxy = wily.profiles.proxy(profile.id)
+httpx.get('https://api.ipify.org', proxy=proxy.proxy_server)   # through the app, while the browser runs
+httpx.get('https://api.ipify.org', proxy=proxy.upstream)       # straight to the provider, same exit
+```
+
+Measured on 24.11.2026 with a SOAX proxy whose login has `{session}`: the forwarder, `upstream` and the browser's own
+page all left from one IP; `upstream` was the same before the launch and during it. Each read of `upstream` for a
+stopped profile is a read of the proxy's login, which the server journals. Needs a wily app newer than 0.1.6
+(`GET /v1/profiles/{id}/proxy`); an older one raises `UnsupportedError`. `Proxy.url()` refuses a `{session}` template
+for this reason ([proxies.md](proxies.md#validation)).
 
 **What a page can see.** Driving a browser over CDP is visible to a page unless the core hides it, and wily.bot
 checks exactly this (measured on wily.bot, 24.11.2026):
@@ -138,7 +161,7 @@ raises `ConflictError` naming what is missing. A profile running on another devi
 (`profile_in_use`). `launch.warnings` lists what the app adjusted. Closing the browser window ends the profile's
 session; the app saves its cookies.
 
-`Launch`: `profile_id`, `core`, `pid`, `executable`, `user_data_dir`, `session_id`, `warnings`.
+`Launch`: `profile_id`, `core`, `pid`, `executable`, `user_data_dir`, `session_id`, `proxy_server` (newer than 0.1.6), `warnings`.
 `DevTools`: `port`, `http_url` (Playwright `connect_over_cdp`, Puppeteer `browserURL`), `ws_url`.
 
 Full scripts: [examples/launch_playwright.py](examples/launch_playwright.py) (the three steps) and

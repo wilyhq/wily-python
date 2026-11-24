@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from typing import TYPE_CHECKING
 
 import pytest
+from fake_app import FORWARDER
 from pydantic import ValidationError
 
-from wily_client import ConflictError, Launch, ProfileOs, Wily
+from wily_client import ConflictError, Launch, ProfileOs, UnsupportedError, Wily
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -135,11 +137,31 @@ def launch_devtools_url(wily: Wily, launch: Launch) -> str:
     return wily.profiles.devtools(launch, timeout=2).http_url
 
 
-def test_proxy_of_a_profile(wily: Wily) -> None:
-    proxy = wily.proxies.create(name='de', protocol='http', host='gate.example.net', port=8080, username='u', password='p')
-    with_proxy = wily.profiles.create(name='a', proxy_id=proxy.id)
-    found = wily.proxy_of(with_proxy.id)
-    assert found == proxy
-    assert found is not None
-    assert found.url() == 'http://u:p@gate.example.net:8080'
-    assert wily.proxy_of(wily.profiles.create(name='b').id) is None
+def test_proxy_of_a_profile_has_its_session_filled_and_the_forwarder_while_running(wily: Wily) -> None:
+    """The two ways out through the profile's exit: the app's forwarder (while running) and the provider address."""
+    proxy = wily.proxies.create(
+        name='soax', protocol='http', host='proxy.soax.com', port=5000, username='pkg-1-sessionid-{session}', password='p@ss'
+    )
+    profile = wily.profiles.create(name='a', proxy_id=proxy.id)
+    with pytest.raises(ValueError, match='profiles.proxy'):
+        proxy.url()  # the template itself would be a session nobody else uses
+
+    stopped = wily.profiles.proxy(profile.id)
+    assert stopped is not None
+    assert (stopped.running, stopped.proxy_server, stopped.name) == (False, None, 'soax')
+    assert re.fullmatch(r'http://pkg-1-sessionid-[0-9a-f]{16}:p%40ss@proxy\.soax\.com:5000', stopped.upstream)
+    assert 'p%40ss' not in repr(stopped)
+
+    launch = wily.profiles.launch(profile.id)
+    running = wily.profiles.proxy(profile.id)
+    assert running is not None
+    assert running.proxy_server == launch.proxy_server == FORWARDER
+    assert running.upstream == stopped.upstream  # one session for the pair: the same exit as the browser
+
+    assert wily.profiles.proxy(wily.profiles.create(name='b').id) is None
+
+
+def test_proxy_of_a_profile_from_an_app_without_the_route(wily: Wily, fake: FakeApp) -> None:
+    fake.routes = [r for r in fake.routes if not r[1].pattern.endswith('/proxy$')]
+    with pytest.raises(UnsupportedError, match='update it'):
+        wily.profiles.proxy(wily.profiles.create(name='a').id)

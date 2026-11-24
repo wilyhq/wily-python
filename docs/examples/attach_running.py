@@ -23,13 +23,17 @@ def main(name: str) -> None:
         # (http://127.0.0.1:<port>) for a proxy with a login — usable from this machine without the password.
         print('proxy_server ', running.proxy_server)
 
-        proxy = wily.proxy_of(profile.id)  # the configured proxy in full: host, port, login
+        # The profile's proxy as the app connects to it. Two ways to leave through the browser's exit:
+        #   proxy_server — the app's local forwarder the browser uses (no password needed, only while it runs);
+        #   upstream     — the provider's address with this profile's login, {session} filled by the server
+        #                  (carries the password: never print or log it whole).
+        proxy = wily.profiles.proxy(profile.id)
         if proxy:
-            print('proxy        ', proxy.name, proxy.url(with_credentials=False))
-
-        # Same exit as the browser, from Python:
-        if running.proxy_server:
-            print('exit IP      ', httpx.get('https://api.ipify.org', proxy=running.proxy_server, timeout=30).text)
+            forwarder = proxy.proxy_server or running.proxy_server  # None from the app when another one started it
+            print('proxy        ', proxy.name, '| forwarder', forwarder)
+            via_forwarder = httpx.get('https://api.ipify.org', proxy=forwarder, timeout=30).text
+            via_upstream = httpx.get('https://api.ipify.org', proxy=proxy.upstream, timeout=30).text
+            print('exit IP      ', via_forwarder, '(forwarder)', via_upstream, '(upstream)')
 
         with sync_playwright() as pw:
             page = pw.chromium.connect_over_cdp(running.devtools.http_url).contexts[0].new_page()

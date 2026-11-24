@@ -17,7 +17,7 @@ def test_proxy_crud_and_check(wily: Wily) -> None:
         protocol='socks5',
         host='gate.example.net',
         port=1080,
-        username='user-{session}',
+        username='user',
         password='p@ss',
         country='de',
     )
@@ -25,7 +25,7 @@ def test_proxy_crud_and_check(wily: Wily) -> None:
     assert proxy.country == 'DE'
     assert proxy.alive is None
     assert 'p@ss' not in repr(proxy)
-    assert proxy.url() == 'socks5://user-%7Bsession%7D:p%40ss@gate.example.net:1080'
+    assert proxy.url() == 'socks5://user:p%40ss@gate.example.net:1080'
 
     assert [p.name for p in wily.proxies.list()] == ['de-1']
     assert wily.proxies.find('de-1') == proxy

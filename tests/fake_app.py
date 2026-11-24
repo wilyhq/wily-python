@@ -21,13 +21,14 @@ import uuid
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
 NOW = '2026-11-24T10:00:00Z'
+FORWARDER = 'http://127.0.0.1:47001'
 # Not exported by `_winapi`: byte mode is the zero flag of CreateNamedPipe.
 PIPE_TYPE_BYTE = 0
 PIPE_READMODE_BYTE = 0
@@ -71,6 +72,7 @@ class FakeApp:
                 ('POST', '/v1/profiles/(?P<id>[^/]+)/restore', self.profiles_restore),
                 ('POST', '/v1/profiles/(?P<id>[^/]+)/clone', self.profiles_clone),
                 ('POST', '/v1/profiles/(?P<id>[^/]+)/launch', self.profiles_launch),
+                ('GET', '/v1/profiles/(?P<id>[^/]+)/proxy', self.profiles_proxy),
                 ('GET', '/v1/profile-folders', self.folders_list),
                 ('POST', '/v1/profile-folders', self.folders_create),
             ]
@@ -258,7 +260,42 @@ class FakeApp:
         port = serve_devtools(self, id)
         (data_dir / 'DevToolsActivePort').write_text(f'{port}\n/devtools/browser/abc\n', encoding='utf-8')
         launched = {'pid': 777, 'executable': '/cores/chromium/chrome', 'user_data_dir': str(data_dir)}
-        return 200, {'profile_id': id, 'core': p['core'], 'launched': launched, 'session_id': 's1', 'warnings': []}
+        server = self._proxy_view(id)[0] if p['proxy'] else None
+        return 200, {
+            'profile_id': id,
+            'core': p['core'],
+            'launched': launched,
+            'session_id': 's1',
+            'proxy_server': server,
+            'warnings': [],
+        }
+
+    def _proxy_view(self, profile_id: str) -> tuple[str, str]:
+        """As wily-app does it: a login goes through a local forwarder; `{session}` is fixed per (proxy, profile)."""
+        proxy = self.proxies[self.profiles[profile_id]['proxy']['id']]
+        session = hashlib.sha256((proxy['id'] + profile_id).encode()).hexdigest()[:16]
+        login = [quote((v or '').replace('{session}', session), safe='') for v in (proxy['username'], proxy['password'])]
+        direct = f'{proxy["protocol"]}://{proxy["host"]}:{proxy["port"]}'
+        if not proxy['username']:
+            return direct, direct
+        auth = login[0] + (f':{login[1]}' if login[1] else '')
+        return FORWARDER, f'{proxy["protocol"]}://{auth}@{proxy["host"]}:{proxy["port"]}'
+
+    def profiles_proxy(self, id: str, **_: Any) -> Answer:  # noqa: A002
+        p = self.profiles.get(id)
+        if p is None:
+            return err(404, 'not_found', 5, f'no profile {id}')
+        running = p['state'] == 'running'
+        if not p['proxy']:
+            return 200, {'profile_id': id, 'running': running, 'proxy': None}
+        server, upstream = self._proxy_view(id)
+        view = {
+            'id': p['proxy']['id'],
+            'name': p['proxy']['name'],
+            'proxy_server': server if running else None,
+            'upstream': upstream,
+        }
+        return 200, {'profile_id': id, 'running': running, 'proxy': view}
 
     def folders_list(self, **_: Any) -> Answer:
         return 200, {'folders': list(self.folders.values())}

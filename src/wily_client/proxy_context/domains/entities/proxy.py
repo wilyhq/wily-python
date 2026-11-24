@@ -9,6 +9,8 @@ from wily_client.common.domains.model import Entity
 from wily_client.proxy_context.domains.constants.proxy import ProxyKind, ProxyProtocol
 from wily_client.proxy_context.domains.value_objects.proxy_check import ProxyCheck
 
+SESSION = '{session}'
+
 
 class Proxy(Entity):
     """A proxy of the workspace (`ProxyOut` of https://api.wily.bot/api/openapi.json).
@@ -36,8 +38,17 @@ class Proxy(Entity):
         return None if self.last_check is None else self.last_check.ok
 
     def url(self, *, with_credentials: bool = True) -> str:
-        """`socks5://user:pass@host:port` — for httpx, requests or Playwright's `proxy`."""
+        """`socks5://user:pass@host:port` — for httpx, requests or Playwright's `proxy`.
+
+        A login with `{session}` is a template the server fills per profile; connecting with it as is would land on a
+        session nobody else uses — so it raises: take `wily.profiles.proxy(profile_id).upstream` instead.
+        """
         auth = ''
+        if with_credentials and any(SESSION in (v or '') for v in (self.username, self.password)):
+            raise ValueError(
+                f'proxy {self.name!r} has {SESSION} in its login, which the server fills per profile: '
+                'use wily.profiles.proxy(profile_id).upstream'
+            )
         if with_credentials and self.username:
             auth = quote(self.username, safe='')
             if self.password:

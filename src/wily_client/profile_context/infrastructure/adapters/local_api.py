@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from wily_client.common.infrastructure.local_api import LONG_TIMEOUT
+from wily_client.common.domains.errors import NotFoundError, UnsupportedError
+from wily_client.common.infrastructure.local_api import LONG_TIMEOUT, NO_ROUTE
 from wily_client.profile_context.domains.entities.profile import Folder, Profile
-from wily_client.profile_context.domains.value_objects.profile import Launch
+from wily_client.profile_context.domains.value_objects.profile import Launch, ProfileProxy
 
 if TYPE_CHECKING:
     import builtins
@@ -52,6 +53,19 @@ class ProfileLocalApiAdapter:
     def launch(self, profile_id: str) -> Launch:
         d = self._api.call('POST', _path(profile_id, '/launch'), timeout=LONG_TIMEOUT)
         return Launch.model_validate({**d, **(d.get('launched') or {})})
+
+    def proxy(self, profile_id: str) -> ProfileProxy | None:
+        try:
+            d = self._api.call('GET', _path(profile_id, '/proxy'))
+        except NotFoundError as e:
+            if e.message.startswith(NO_ROUTE):
+                raise UnsupportedError('this app has no GET /v1/profiles/{id}/proxy: update it', status=404) from e
+            raise
+        proxy = d.get('proxy')
+        if not proxy:
+            return None
+        fields = {**proxy, 'proxy_id': proxy['id'], 'profile_id': d['profile_id'], 'running': d['running']}
+        return ProfileProxy.model_validate(fields)
 
     def folders(self) -> builtins.list[Folder]:
         return [Folder.model_validate(f) for f in self._api.call('GET', '/v1/profile-folders').get('folders', [])]

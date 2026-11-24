@@ -21,7 +21,7 @@ from wily_client.common.domains.errors import (
 from wily_client.profile_context.domains.constants.profile import ProfileOs, WebrtcMode
 from wily_client.profile_context.domains.dto.profile import ProfileChanges, ProfileDraft, ProfileFilter
 from wily_client.profile_context.domains.entities.profile import Folder, Profile
-from wily_client.profile_context.domains.value_objects.profile import Bookmark, DevTools, Launch, RunningBrowser
+from wily_client.profile_context.domains.value_objects.profile import Bookmark, DevTools, Launch, ProfileProxy, RunningBrowser
 from wily_client.proxy_context.domains.constants.proxy import ProxyKind, ProxyProtocol
 from wily_client.proxy_context.domains.dto.proxy import ProxyChanges, ProxyDraft
 from wily_client.proxy_context.domains.entities.proxy import Proxy
@@ -56,6 +56,7 @@ __all__ = [
     'ProxyDraft',
     'ProxyKind',
     'ProxyProtocol',
+    'ProfileProxy',
     'RunningBrowser',
     'UnavailableError',
     'UnsupportedError',

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from wily_client.profile_context.applications.gateway import BrowserGateway, DevToolsGateway, ProcessGateway, ProfileGateway
     from wily_client.profile_context.domains.entities.profile import Folder, Profile
-    from wily_client.profile_context.domains.value_objects.profile import DevTools, Launch
+    from wily_client.profile_context.domains.value_objects.profile import DevTools, Launch, ProfileProxy
 
 
 class ProfileApplication:
@@ -67,6 +67,12 @@ class ProfileApplication:
     def launch(self, profile_id: str) -> Launch:
         """Starts the profile's browser here, through its proxy. Needs an installed core and a sign-in."""
         return self._gateway.launch(profile_id)
+
+    def proxy(self, profile_id: str) -> ProfileProxy | None:
+        """The profile's proxy as the app connects to it, or `None` without one: `proxy_server` — what its running
+        browser goes through; `upstream` — the provider's address with this profile's login, `{session}` filled, so a
+        direct connection gets the browser's exit. The server journals each read of the login."""
+        return self._gateway.proxy(profile_id)
 
     def devtools(self, launch: Launch, timeout: float = 30.0, interval: float = 0.2) -> DevTools:
         """The CDP endpoint of a launched browser, once it has written it — for Playwright or Puppeteer."""

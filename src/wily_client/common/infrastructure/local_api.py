@@ -103,6 +103,10 @@ class LocalApi:
         self.close()
 
 
+NO_ROUTE = 'the app has no '
+"""How a 404 without an error body starts: the route itself is missing — an app older than the operation."""
+
+
 def _param(value: Any) -> Any:
     return ('true' if value else 'false') if isinstance(value, bool) else value
 
@@ -126,6 +130,6 @@ def _error(response: httpx.Response) -> WilyError:
     if response.status_code == httpx.codes.FORBIDDEN and not err:
         return error_for('denied', 'the app refused this request (browser-like or foreign Host)', status=403)
     if response.status_code == httpx.codes.NOT_FOUND and not err:
-        return error_for('not_found', f'the app has no {response.request.url.path}', status=404)
+        return error_for('not_found', f'{NO_ROUTE}{response.request.url.path}', status=404)
     message = err.get('message') or response.text or response.reason_phrase
     return error_for(str(err.get('code', 'failure')), message, status=response.status_code)
