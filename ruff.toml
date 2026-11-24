@@ -1,0 +1,110 @@
+# Format settings file
+# https://docs.astral.sh/ruff/settings/
+src = [
+    "src"
+]
+include = [
+    "**/*.py"
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".import_linter_cache",
+    # Agent worktrees are transient checkouts of this same repo living inside it: linting
+    # them lints a copy, and a copy mid-edit fails the gate for whoever is not editing it.
+    ".claude",
+    ".venv",
+    "dist",
+]
+
+
+line-length = 128
+target-version = "py311"
+
+[lint]
+preview = true
+external = ["complexipy"]
+
+
+# Avialable rules
+# https://docs.astral.sh/ruff/rules/
+select = [
+    "F",        # pyflakes
+    "E", "W",   # pycodestyle
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "BLE",      # flake8-blind-except
+    "B",        # flake8-bugbear
+    "A",        # flake8-builtins
+    "COM",      # flake8-commas
+    "C4",       # flake8-comprehensions
+    "T10",      # flake8-debugger
+    "INP",      # flake8-no-pep420
+    "T20",      # flake8-print
+    "Q",        # flake8-quotes
+    "SIM",      # flake8-simplify
+    "TCH",      # flake8-type-checking
+    "ARG",      # flake8-unused-arguments
+    "TD",       # flake8-todos
+    "ERA",      # eradicate
+
+    # Pylint
+    "PLC0132", "PLC0208", "PLC3002",
+    "PLE0307", "PLE0704",
+    "SIM101", "PLR1714", "PLR2004",
+    "PLW0406", "PLW0711",
+]
+
+
+# Conflict rules with format mode (black tool)
+# https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+ignore = [
+    # pycodestyle
+    "E111", "E114", "E117", "W191",
+     # pep8-naming
+    "N805",
+    # flake8-commas
+    "COM812", "COM819",
+    # flake8-quotes
+    "Q000", "Q001", "Q002", "Q003",
+    # flake8-todos
+    "TD003",
+    "TRY201", "TRY004",
+    "RUF012",
+    "PLW1508"
+]
+
+[format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+
+[lint.extend-per-file-ignores]
+"__init__.py" = ["F401"]
+# Examples are scripts a person runs: they print, and they are not a package.
+"docs/examples/*.py" = ["T201", "INP001"]
+"tests/**" = ["PLR2004", "S101", "ARG001", "ARG002", "INP001"]
+
+
+[lint.isort]
+combine-as-imports = true
+split-on-trailing-comma = false
+known-first-party = ["wily_client"]
+
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+
+
+# Pydantic reads annotations at runtime: an import a model's field uses must stay a real import.
+[lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "wily_client.common.domains.model.ValueObject",
+    "wily_client.common.domains.model.Entity",
+    "wily_client.common.domains.model.DataTransferObject",
+]

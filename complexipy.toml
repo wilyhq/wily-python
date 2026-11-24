@@ -1,0 +1,4 @@
+paths = ["src"]
+exclude = [".venv", "dist"]
+max-complexity-allowed = 15
+failed = true

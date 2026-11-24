@@ -1,0 +1,17 @@
+[terminal]
+output-format = "concise"
+
+[environment]
+# The lowest Python the library supports: a newer-only API must fail here, not on a user's machine.
+python-version = "3.11"
+
+[src]
+include = ["src", "tests", "docs/examples"]
+exclude = [".venv", "dist"]
+
+[rules]
+unused-type-ignore-comment = "ignore"
+
+[analysis]
+# Examples may use a tool the reader installs themselves; the library does not depend on it.
+allowed-unresolved-imports = ["playwright", "playwright.*"]

@@ -1,0 +1,76 @@
+# The layers of docs/architecture/OVERVIEW.md, checked on every `make lint`.
+
+[tool.importlinter]
+root_packages = ["wily_client"]
+include_external_packages = true
+
+
+[[tool.importlinter.contracts]]
+name = "Context independence (contexts must not import from each other)"
+type = "independence"
+modules = [
+    "wily_client.app_context",
+    "wily_client.profile_context",
+    "wily_client.proxy_context",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "Domain layer purity (domains know no transport)"
+type = "forbidden"
+source_modules = [
+    "wily_client.common.domains",
+    "wily_client.app_context.domains",
+    "wily_client.profile_context.domains",
+    "wily_client.proxy_context.domains",
+]
+forbidden_modules = [
+    "httpx",
+    "httpcore",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "Applications see ports, not adapters"
+type = "forbidden"
+source_modules = [
+    "wily_client.app_context.applications",
+    "wily_client.profile_context.applications",
+    "wily_client.proxy_context.applications",
+]
+forbidden_modules = [
+    "httpx",
+    "httpcore",
+    "wily_client.common.infrastructure",
+    "wily_client.app_context.infrastructure",
+    "wily_client.profile_context.infrastructure",
+    "wily_client.proxy_context.infrastructure",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "Layers contract"
+type = "layers"
+containers = [
+    "wily_client.common",
+    "wily_client.app_context",
+    "wily_client.profile_context",
+    "wily_client.proxy_context",
+]
+layers = [
+    "(infrastructure)",
+    "(applications)",
+    "(services)",
+    "(domains)",
+]
+
+
+[[tool.importlinter.contracts]]
+name = "Only the composition root wires adapters"
+type = "layers"
+layers = [
+    "client",
+    "app_context | profile_context | proxy_context",
+    "common",
+]
+containers = ["wily_client"]

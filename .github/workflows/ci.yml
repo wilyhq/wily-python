@@ -1,0 +1,72 @@
+# The same `make` targets a person runs, on the three operating systems the library promises.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: make check · ${{ matrix.os }} · py${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The lowest supported and the newest uv 0.10.4 installs.
+        python: ["3.11", "3.14"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.4"
+      - name: GNU make on Windows
+        if: runner.os == 'Windows'
+        run: command -v make || choco install make --no-progress -y
+      - run: make sync PY=${{ matrix.python }}
+      - run: make check PY=${{ matrix.python }}
+
+  real-app:
+    # Against the released `wily serve`: macOS arm64 and Windows x64 have builds, Linux not yet.
+    name: make test-real · ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            asset: wily-cli-*-macos-arm64.tar.gz
+          - os: windows-latest
+            asset: wily-*-windows-x64.zip
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      WILY_VERSION: v0.1.6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.4"
+      - name: GNU make on Windows
+        if: runner.os == 'Windows'
+        run: command -v make || choco install make --no-progress -y
+      - name: Download wily ${{ env.WILY_VERSION }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/wily" && cd "$RUNNER_TEMP/wily"
+          gh release download "$WILY_VERSION" -R wilyhq/wily -p '${{ matrix.asset }}'
+          case "$(ls)" in *.zip) unzip -q ./*.zip ;; *) tar xzf ./*.tar.gz ;; esac
+          bin=$(find "$PWD" -type f \( -name wily -o -name wily.exe \) | head -1)
+          "$bin" --version
+          echo "WILY_BIN=$bin" >> "$GITHUB_ENV"
+      - run: make sync
+      - run: make test-real WILY_BIN="$WILY_BIN"
