@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 NOW = '2026-11-24T10:00:00Z'
+# Not exported by `_winapi`: byte mode is the zero flag of CreateNamedPipe.
+PIPE_TYPE_BYTE = 0
+PIPE_READMODE_BYTE = 0
 Answer = tuple[int, dict[str, Any]]
 
 
@@ -314,6 +317,9 @@ def serve_tcp(app: FakeApp, token: str) -> Door:
 
 
 def serve_unix(app: FakeApp, path: str) -> Door:
+    if sys.platform == 'win32':
+        raise RuntimeError('Unix sockets are served on macOS and Linux only')
+
     class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
         daemon_threads = True
 
@@ -340,7 +346,7 @@ def serve_pipe(app: FakeApp, name: str) -> Door:
         return _winapi.CreateNamedPipe(
             name,
             _winapi.PIPE_ACCESS_DUPLEX,
-            _winapi.PIPE_TYPE_BYTE | _winapi.PIPE_READMODE_BYTE | _winapi.PIPE_WAIT,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | _winapi.PIPE_WAIT,
             _winapi.PIPE_UNLIMITED_INSTANCES,
             65536,
             65536,

@@ -18,8 +18,11 @@ lint:  ## Every static check (what CI runs): ruff, format, ty, import layers, co
 	$(UV_RUN) ruff format --check --config ruff.toml
 	@$(MAKE) --no-print-directory typecheck imports complexity
 
-typecheck:  ## ty over src, tests and docs/examples
-	$(UV_RUN) ty check --config-file ty.toml
+# ty narrows on `sys.platform`, so each OS's branch is checked only under that OS: all three, from any machine.
+typecheck:  ## ty over src, tests and docs/examples, as on macOS, Linux and Windows
+	$(UV_RUN) ty check --config-file ty.toml --python-platform darwin
+	$(UV_RUN) ty check --config-file ty.toml --python-platform linux
+	$(UV_RUN) ty check --config-file ty.toml --python-platform win32
 
 imports:  ## The layers of docs/architecture/OVERVIEW.md (import-linter)
 	$(UV_RUN) lint-imports --config lint-imports.toml

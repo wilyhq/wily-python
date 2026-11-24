@@ -20,8 +20,8 @@ reason on the same line. A new public name goes into `wily_client/__init__.py` a
 ## Three operating systems
 
 Everything must work on macOS, Windows and Linux. Before using a path, a socket, a process call or a shell command,
-ask what it does on the other two. Windows code is guarded with `if sys.platform == 'win32'` (ty checks each branch on
-its own OS in CI). Makefile recipes stay POSIX shell, run from Git Bash on Windows.
+ask what it does on the other two. Windows code is guarded with `if sys.platform == 'win32'` (`make typecheck` checks the
+branches of all three OSes from any machine). Makefile recipes stay POSIX shell, run from Git Bash on Windows.
 
 ## Validation is pydantic's
 

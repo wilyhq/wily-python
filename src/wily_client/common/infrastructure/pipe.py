@@ -63,12 +63,12 @@ class PipeStream(httpcore.NetworkStream):
         try:
             if err == _winapi.ERROR_IO_PENDING:
                 self._wait(ov, timeout, httpcore.ReadTimeout)
-            return bytes(ov.getbuffer())
+            return bytes(ov.getbuffer() or b'')
         except OSError as e:
             if e.winerror in CLOSED:
                 return b''
             if e.winerror == ERROR_MORE_DATA:
-                return bytes(ov.getbuffer())
+                return bytes(ov.getbuffer() or b'')
             raise httpcore.ReadError(str(e)) from e
 
     def write(self, buffer: bytes, timeout: float | None = None) -> None:

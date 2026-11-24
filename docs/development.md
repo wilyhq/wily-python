@@ -27,7 +27,7 @@ make check         # everything a change must pass
 |---|---|
 | `make sync` | `uv sync`: the library (editable) and the dev group |
 | `make lint` | `ruff check`, `ruff format --check`, then `typecheck`, `imports`, `complexity` |
-| `make typecheck` | `ty check` over `src`, `tests` and `docs/examples`, at Python 3.11 rules |
+| `make typecheck` | `ty check` over `src`, `tests` and `docs/examples`, at Python 3.11 rules, once per OS (`--python-platform darwin`, `linux`, `win32`) |
 | `make imports` | `lint-imports`: the layers of [architecture/OVERVIEW.md](architecture/OVERVIEW.md) |
 | `make complexity` | `complexipy`: no function above 15 |
 | `make format` | `ruff check --fix` and `ruff format` |
