@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 DISCOVERY_FILE = 'desktop.json'
 
@@ -29,7 +29,8 @@ def data_dir(platform: str = sys.platform, env: dict[str, str] | None = None, ho
         roaming = env.get('APPDATA') or str(home / 'AppData' / 'Roaming')
         return Path(roaming) / 'wily' / 'wily' / 'data'
     xdg = env.get('XDG_DATA_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else home / '.local' / 'share'
+    # XDG ignores a relative value; judged by POSIX rules, which is what a Linux path follows.
+    base = Path(xdg) if xdg and PurePosixPath(xdg).is_absolute() else home / '.local' / 'share'
     return base / 'wily'
 
 
